@@ -1,3 +1,6 @@
 .env
 node_modules/*
 test.js
+notes.md
+users.ts
+package-lock.json

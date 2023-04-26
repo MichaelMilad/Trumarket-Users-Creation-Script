@@ -27,8 +27,8 @@ async function createUser(
   locationKeys: [string]
 ): Promise<any> {
   const data = await postReq('/user-management/users', {
-    fullName: user.name,
-    email: user.email,
+    fullName: user.Name,
+    email: user.Email,
     teamKeys,
     locationKeys,
   });
@@ -38,73 +38,77 @@ async function createUser(
   return data;
 }
 
-async function assignUserToLocation(user: User) {
+async function searchUserKey(email: string) {
+  const response = await postReq('/user-management/user/search', {
+    filter: {
+      email: email,
+    },
+    select: ['key'],
+  });
+
+  if (response.data.length <= 0) {
+    console.log(`User With Email ${email} Key Not Found`);
+    throw new Error('Userkey Not Found');
+  }
+
+  return response.data.data[0].key;
+}
+
+async function assignUserToLocation(locationKey: string, userKey: string) {
   try {
-    if (locations.hasOwnProperty(user.officeName)) {
-      return await postReq('/location-management/user/assign', {
-        assigning: [
-          {
-            locationKey: locations['Crimelock Location Kansas'],
-            userKey: user.key,
-          },
-        ],
-      });
-    } else {
-      console.log(`NO Valid Location for ${user}`);
-    }
+    return await postReq('/location-management/user/assign', {
+      assigning: [
+        {
+          locationKey: locationKey,
+          userKey: userKey,
+        },
+      ],
+    });
   } catch (e: any) {
-    console.log(e.response, e.config.data);
+    console.log(`Error Assigning user ${userKey} to location ${locationKey}`);
+    console.log(e.request?.res?.statusCode, e.response?.data, e.config?.data);
   }
 }
 
-async function assignUserToTeam(user: User) {
+async function assignUserToTeam(teamKey: string, userKey: string) {
   try {
-    if (user.primaryGroup.includes('User')) {
-      await postReq('/team-management/user/assign', {
-        assigning: [
-          {
-            teamKey: teams.brokers,
-            userKey: user.key,
-          },
-        ],
-      });
-
-      return console.log(`User ${user.name} Added to brokers team`);
-    } else if (user.primaryGroup.includes('Admin')) {
-      await postReq('/team-management/user/assign', {
-        assigning: [
-          {
-            teamKey: teams.admins,
-            userKey: user.key,
-          },
-        ],
-      });
-
-      return console.log(`User ${user.name} Added to admin team`);
-    } else {
-      console.log("User didn't belong to any Group");
-    }
+    await postReq('/team-management/user/assign', {
+      assigning: [
+        {
+          teamKey: teamKey,
+          userKey: userKey,
+        },
+      ],
+    });
   } catch (e: any) {
-    console.log(e.response, e.config.data);
+    console.log(
+      'Error',
+      e.request?.res?.statusCode,
+      e.response?.data,
+      e.config?.data
+    );
   }
 }
 
 const seed = async () => {
   users.forEach(async (user: User) => {
-    const teamKey = user.primaryGroup.includes('User')
+    const teamKey = user.PrimaryGroup.includes('User')
       ? teams.brokers
       : teams.admins;
 
-    const locationKey = locations[user.officeName];
+    const locationKey = locations[user.OfficeName];
 
     try {
       await createUser(user, [teamKey], [locationKey]);
     } catch (e: any) {
-      if (e.data?.error == 'User already exists!')
-        console.log('User Already Exists');
-      else
+      if (e.response?.data.error == 'User already exists!') {
+        const userKey = await searchUserKey(user.Email);
+        await assignUserToTeam(teamKey, userKey);
+        await assignUserToLocation(locationKey, userKey);
+
+      } else
         console.log(
-          'UNCAUGHT',
+          'Error',
           e.request?.res?.statusCode,
           e.response?.data,
           e.config?.data

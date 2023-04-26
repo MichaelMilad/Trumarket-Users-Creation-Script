@@ -1,7 +1,7 @@
 export interface User {
-    name: string;
-    email: string;
-    primaryGroup: string;
-    officeName: string;
+    Name: string;
+    Email: string;
+    PrimaryGroup: string;
+    OfficeName: string;
     key?: string 
 }
